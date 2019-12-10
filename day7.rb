@@ -40,7 +40,7 @@ def amplify_with_phase(phase_set, memcore)
   # Set up our VMs
   ('a'..'e').each do |ltr|
     amps[ltr] = {
-      vm: Intcode.new(memcore),
+      vm: Intcode.new(memcore, true),
       name: ltr,
     }
     amps[ltr][:vm].continue(phase_set.shift)

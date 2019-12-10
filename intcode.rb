@@ -13,21 +13,23 @@ class Intcode
     OPCODE_OUTPUT = 4
     OPCODE_JUMPIFTRUE = 5
     OPCODE_JUMPIFFALSE = 6
-    # The HALT opcode
+    OPCODE_REBASE = 9
     OPCODE_HALT = 99
 
     MODE_POSITION = 0
     MODE_IMMEDIATE = 1
+    MODE_RELATIVE = 2
 
     OPCODE_NAMES = {
-      1 => 'add',
+      1 => 'add ',
       2 => 'mult',
-      3 => 'input',
-      4 => 'output',
-      5 => 'jit',
-      6 => 'jif',
-      7 => 'lt',
-      8 => 'eq',
+      3 => 'inp ',
+      4 => 'out ',
+      5 => 'jit ',
+      6 => 'jif ',
+      7 => 'lt  ',
+      8 => 'eq  ',
+      9 => 'reb ',
       99 => 'halt',
     }
 
@@ -43,6 +45,7 @@ class Intcode
         @opcode = 0
         @input = []
         @output = []
+        @base = 0
         @debug_mode = debug_mode
         @status = STATUS_RUN
     end
@@ -60,7 +63,7 @@ class Intcode
           "#{dbga(0)}, #{dbga(1)} => #{dbga(2,true)}"
         when 3
           "#{@input[0]} => #{dbga(0,true)}"
-        when 4
+        when 4, 9
           "#{dbga(0)}"
         when 5, 6
           "#{dbga(0)} to #{dbga(1)}"
@@ -72,17 +75,20 @@ class Intcode
     end
 
     def dbga(pos, sto=false)
+      mode = @modes[-(1+pos)]
       if sto then
-        return "@#{@memory[@ip+pos]}"
-      elsif @modes[pos] == 0 then
-        return "*#{@memory[@ip+pos]}(#{@memory[@memory[@ip+pos]]})"
+        return "@#{peek(MODE_IMMEDIATE, pos)}"
+      elsif mode == MODE_POSITION then
+        return "*#{peek(MODE_IMMEDIATE, pos)}(#{peek(MODE_POSITION, pos)})"
+      elsif mode == MODE_RELATIVE then
+        return "*#{peek(MODE_IMMEDIATE, pos)}+#{@base}(#{peek(MODE_RELATIVE, pos)})"
       else
-        return "#{@memory[@ip+pos]}"
+        return "#{peek(MODE_IMMEDIATE, pos)}"
       end
     end
 
     def decode_step
-      value = @memory[@ip]
+      value = peek
       # Pad out the code to a five digit string
       padded = ('0' * (5-value.to_s.length)) + value.to_s
       # Set up our argument state
@@ -92,18 +98,28 @@ class Intcode
       @opcode = padded[3..4].to_i
     end
 
-    def peek(rel=0)
-      return @memory[@ip+rel]
+    def peek(mode = MODE_IMMEDIATE, pos=0)
+      value = case mode
+      when MODE_IMMEDIATE
+        @memory[@ip+pos]
+      when MODE_POSITION
+        @memory[peek(MODE_IMMEDIATE, pos)]
+      when MODE_RELATIVE
+        @memory[peek(MODE_IMMEDIATE, pos) + @base]
+      end
+
+      value == nil ? 0 : value
     end
 
     def argument
-      value = @modes.pop == 0 ? @memory[@memory[@ip]] : @memory[@ip]
+      value = peek(@modes.pop)
+
       @ip += 1
       value
     end
 
     def sto_argument
-      value = @memory[@ip]
+      value = peek
       @modes.pop
       @ip += 1
       value
@@ -143,6 +159,8 @@ class Intcode
         test = argument
         new_location = argument
         @ip = new_location if test == 0
+      elsif opcode=OPCODE_REBASE
+        @base = argument
       elsif opcode==OPCODE_HALT
         @status = STATUS_HALT
       # Halt and catch fire
@@ -177,9 +195,9 @@ class Intcode
         @ip = 0
         @status = STATUS_RUN
         # Keep going until we crash or hit a halt opcode
-        while (@memory[@ip]) != OPCODE_HALT do
+        while peek != OPCODE_HALT do
           output = step
-          # puts "OUT: #{output}" unless output==nil
+          puts "OUT: #{output}" unless output==nil
         end
         @status = STATUS_HALT
         @output
