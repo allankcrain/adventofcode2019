@@ -62,9 +62,11 @@ class Intcode
         when 1, 2, 7, 8
           "#{dbga(0)}, #{dbga(1)} => #{dbga(2,true)}"
         when 3
-          "#{@input[0]} => #{dbga(0,true)}"
-        when 4, 9
+          "#{@input[0]} => #{dbga(0)}"
+        when 4
           "#{dbga(0)}"
+        when 9
+          "+#{dbga(0)}"
         when 5, 6
           "#{dbga(0)} to #{dbga(1)}"
         else
@@ -77,13 +79,13 @@ class Intcode
     def dbga(pos, sto=false)
       mode = @modes[-(1+pos)]
       if sto then
-        return "@#{peek(MODE_IMMEDIATE, pos)}"
+        return "@#{peek(pos)}"
       elsif mode == MODE_POSITION then
-        return "*#{peek(MODE_IMMEDIATE, pos)}(#{peek(MODE_POSITION, pos)})"
+        return "p:#{peek(pos)}(#{peek(pos, MODE_POSITION)})"
       elsif mode == MODE_RELATIVE then
-        return "*#{peek(MODE_IMMEDIATE, pos)}+#{@base}(#{peek(MODE_RELATIVE, pos)})"
+        return "r:#{peek(pos)}+#{@base}(#{peek(pos, MODE_RELATIVE)})"
       else
-        return "#{peek(MODE_IMMEDIATE, pos)}"
+        return "i:#{peek(pos)}"
       end
     end
 
@@ -98,29 +100,28 @@ class Intcode
       @opcode = padded[3..4].to_i
     end
 
-    def peek(mode = MODE_IMMEDIATE, pos=0)
+    def peek(pos=0, mode = MODE_IMMEDIATE)
       value = case mode
       when MODE_IMMEDIATE
         @memory[@ip+pos]
       when MODE_POSITION
-        @memory[peek(MODE_IMMEDIATE, pos)]
+        @memory[peek(pos)]
       when MODE_RELATIVE
-        @memory[peek(MODE_IMMEDIATE, pos) + @base]
+        @memory[peek(pos) + @base]
       end
 
-      value == nil ? 0 : value
+      (value == nil) ? 0 : value
     end
 
     def argument
-      value = peek(@modes.pop)
-
+      value = peek(0, @modes.pop)
       @ip += 1
       value
     end
 
     def sto_argument
-      value = peek
-      @modes.pop
+      mode = @modes.pop
+      value = mode==MODE_RELATIVE ? peek + @base : peek
       @ip += 1
       value
     end
@@ -160,7 +161,7 @@ class Intcode
         new_location = argument
         @ip = new_location if test == 0
       elsif opcode=OPCODE_REBASE
-        @base = argument
+        @base += argument
       elsif opcode==OPCODE_HALT
         @status = STATUS_HALT
       # Halt and catch fire
