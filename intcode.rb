@@ -9,10 +9,14 @@ class Intcode
         8 => ->(a,b) { a == b ? 1 : 0 }
     }
 
+    OPCODE_ADD = 1
+    OPCODE_MULT = 2
     OPCODE_INPUT = 3
     OPCODE_OUTPUT = 4
     OPCODE_JUMPIFTRUE = 5
     OPCODE_JUMPIFFALSE = 6
+    OPCODE_LT = 7
+    OPCODE_EQ = 8
     OPCODE_REBASE = 9
     OPCODE_HALT = 99
 
@@ -160,7 +164,7 @@ class Intcode
         test = argument
         new_location = argument
         @ip = new_location if test == 0
-      elsif opcode=OPCODE_REBASE
+      elsif opcode==OPCODE_REBASE
         @base += argument
       elsif opcode==OPCODE_HALT
         @status = STATUS_HALT
@@ -173,14 +177,16 @@ class Intcode
       output
     end
 
-    def continue(input = [])
+    def continue(input = [], output_handler = nil)
+      return if @status == STATUS_HALT
       @status = STATUS_RUN
       @input += input if input.class == Array
-      @input << input if input.class == Fixnum
+      @input << input if input.class == Integer
       output = nil
       while @status == STATUS_RUN do
         if (peek != OPCODE_INPUT) || @input.length >0 then
           output = step
+          output_handler.call(output) if output != nil && output_handler != nil
         else
           @status = STATUS_INPUT
         end
