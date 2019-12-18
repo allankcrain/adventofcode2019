@@ -38,4 +38,8 @@ class Moon
   def to_s
     "pos=<x=#{@x}, y=#{@y}, z=#{@z}>, vel=<x=#{@v[0]}, y=#{@v[1]}, z=#{@v[2]},>"
   end
+
+  def state
+    [@x, @y, @z, @v[0], @v[1], @v[2]]
+  end
 end
